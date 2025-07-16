@@ -16,4 +16,4 @@ np.save("vector_store/embeddings.npy", embeddings)
 with open("vector_store/id_to_text.pkl", "wb") as f:
     pickle.dump({i: text for i, text in enumerate(texts)}, f)
 
-print("✅ Vector store built successfully.")
+print("Vector store built successfully.")
