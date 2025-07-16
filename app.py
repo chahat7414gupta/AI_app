@@ -1,20 +1,15 @@
-from fastapi import FastAPI, Query
-from pydantic import BaseModel
-
+from fastapi import FastAPI, Request
 from chat_provider import get_provider
 
 app = FastAPI()
-
-class ChatRequest(BaseModel):
-    prompt: str
+provider = get_provider(use_grok=False)  # 👈 switch this to `True` to use Grok
 
 @app.post("/chat")
-async def chat(request: ChatRequest, use_grok: bool = Query(False)):
-    # Just forward the user's prompt to the selected provider
-    provider = get_provider(use_grok)
-    reply = await provider.get_response(request.prompt)
+async def chat(request: Request):
+    data = await request.json()
+    prompt = data.get("prompt", "")
+    if not prompt:
+        return {"error": "Prompt is required"}
 
-    return {
-        "reply": reply,
-        "provider": "grok" if use_grok else "openai"
-    }
+    response = await provider.get_response(prompt)
+    return {"response": response}

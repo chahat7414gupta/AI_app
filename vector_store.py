@@ -1,39 +1,31 @@
 import os
-import faiss
 import pickle
 import numpy as np
-from openai import OpenAI
 from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 
 load_dotenv()
 
-INDEX_PATH = "vector_store/index.faiss"
+EMBEDDINGS_PATH = "vector_store/embeddings.npy"
 MAPPING_PATH = "vector_store/id_to_text.pkl"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 class VectorStore:
     def __init__(self):
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.embed_model = SentenceTransformer("thenlper/gte-small")
+        if not os.path.exists(EMBEDDINGS_PATH) or not os.path.exists(MAPPING_PATH):
+            raise FileNotFoundError("Embedding or mapping files are missing.")
 
-        if not os.path.exists(INDEX_PATH) or not os.path.exists(MAPPING_PATH):
-            raise FileNotFoundError("FAISS index or mapping file not found.")
-
-        self.index = faiss.read_index(INDEX_PATH)
+        self.embeddings = np.load(EMBEDDINGS_PATH)
         with open(MAPPING_PATH, "rb") as f:
             self.id_to_text = pickle.load(f)
 
     def embed(self, text: str) -> np.ndarray:
-        try:
-            response = self.client.embeddings.create(
-                input=[text],
-                model="text-embedding-3-small"
-            )
-            embedding = np.array([response.data[0].embedding], dtype="float32")
-            faiss.normalize_L2(embedding)
-            return embedding
-        except Exception as e:
-            raise RuntimeError(f"[Embedding Error] {e}")
+        return self.embed_model.encode([text], normalize_embeddings=True).astype("float32")
 
     def search(self, prompt: str, top_k: int = 3) -> str:
-        embedding = self.embed(prompt)
-        D, I = self.index.search(embedding, top_k)
-        return "\n".join([self.id_to_text[i] for i in I[0] if i in self.id_to_text])
+        query_vec = self.embed(prompt)
+        sim_scores = cosine_similarity(query_vec, self.embeddings)[0]
+        top_indices = sim_scores.argsort()[::-1][:top_k]
+        return "\n".join([self.id_to_text[i] for i in top_indices if i in self.id_to_text])
