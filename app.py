@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from chat_provider import get_provider
 
 app = FastAPI()
-provider = get_provider(use_grok=False)  # 👈 switch this to `True` to use Grok
+provider = get_provider(use_grok=False)  # switch this to `True` to use Grok
 
 @app.post("/chat")
 async def chat(request: Request):
